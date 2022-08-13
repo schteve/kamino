@@ -7,6 +7,27 @@ struct Args {
     dir: PathBuf,
 }
 
+struct DoOnce<F> {
+    done: bool,
+    f: F,
+}
+
+impl<F> DoOnce<F>
+where
+    F: FnMut(),
+{
+    fn new(f: F) -> Self {
+        Self { done: false, f }
+    }
+
+    fn do_once(&mut self) {
+        if !self.done {
+            self.done = true;
+            (self.f)();
+        }
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -27,13 +48,11 @@ fn main() {
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
-            let mut printed_header = false;
+            let mut print_header =
+                DoOnce::new(|| println!("Repo in {:?}:", dir.file_name().unwrap()));
 
             if check_uncommitted(&repo) {
-                if !printed_header {
-                    printed_header = true;
-                    println!("Repo in {:?}:", dir.file_name().unwrap());
-                }
+                print_header.do_once();
                 println!("    Has uncommitted changes");
             }
 
@@ -41,10 +60,7 @@ fn main() {
             for ab in ahead_behinds {
                 if let Some(ahead) = ab.ahead {
                     if ahead > 0 {
-                        if !printed_header {
-                            printed_header = true;
-                            println!("Repo in {:?}:", dir.file_name().unwrap());
-                        }
+                        print_header.do_once();
                         println!(
                             "    Branch {} is ahead of {} by {} commits",
                             ab.branch_name.as_deref().unwrap_or("(unnamed??)"),
@@ -56,10 +72,7 @@ fn main() {
 
                 if let Some(behind) = ab.behind {
                     if behind > 0 {
-                        if !printed_header {
-                            printed_header = true;
-                            println!("Repo in {:?}:", dir.file_name().unwrap());
-                        }
+                        print_header.do_once();
                         println!(
                             "    Branch {} is behind {} by {} commits",
                             ab.branch_name.as_deref().unwrap_or("(unnamed??)"),
