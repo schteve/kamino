@@ -118,29 +118,29 @@ fn check_ahead_behind(repo: &Repository) -> Vec<AheadBehind> {
     // TODO: Fetch from origin first to make sure upstream is accurate.
     // If your remote isn't origin then tough luck.
 
-    let mut output = Vec::new();
-    for (local, _) in repo.branches(Some(BranchType::Local)).unwrap().flatten() {
-        if let Ok(upstream) = local.upstream() {
-            // We have an upstream, so check the graph difference between it and the local
-            let local_oid = local.get().target().unwrap();
-            let upstream_oid = upstream.get().target().unwrap();
-            let (ahead, behind) = repo.graph_ahead_behind(local_oid, upstream_oid).unwrap();
-            let ab = AheadBehind {
-                ahead: Some(ahead),
-                behind: Some(behind),
-                branch_name: local.name().ok().flatten().map(|x| x.to_owned()),
-                upstream_name: upstream.name().ok().flatten().map(|x| x.to_owned()),
-            };
-            output.push(ab);
-        } else {
-            let ab = AheadBehind {
-                ahead: None,
-                behind: None,
-                branch_name: local.name().ok().flatten().map(|x| x.to_owned()),
-                upstream_name: None,
-            };
-            output.push(ab);
-        }
-    }
-    output
+    repo.branches(Some(BranchType::Local))
+        .unwrap()
+        .flatten()
+        .map(|(local, _)| {
+            if let Ok(upstream) = local.upstream() {
+                // We have an upstream, so check the graph difference between it and the local
+                let local_oid = local.get().target().unwrap();
+                let upstream_oid = upstream.get().target().unwrap();
+                let (ahead, behind) = repo.graph_ahead_behind(local_oid, upstream_oid).unwrap();
+                AheadBehind {
+                    ahead: Some(ahead),
+                    behind: Some(behind),
+                    branch_name: local.name().ok().flatten().map(|x| x.to_owned()),
+                    upstream_name: upstream.name().ok().flatten().map(|x| x.to_owned()),
+                }
+            } else {
+                AheadBehind {
+                    ahead: None,
+                    behind: None,
+                    branch_name: local.name().ok().flatten().map(|x| x.to_owned()),
+                    upstream_name: None,
+                }
+            }
+        })
+        .collect()
 }
