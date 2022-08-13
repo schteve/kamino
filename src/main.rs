@@ -16,16 +16,14 @@ fn main() {
     );
 
     // Get all dir entries in given dir
-    let mut dirs = Vec::new();
-    for entry in read_dir(&args.dir)
+    let dirs: Vec<PathBuf> = read_dir(&args.dir)
         .unwrap_or_else(|_| panic!("Given path is not a directory: {}", args.dir.display()))
         .flatten()
-    {
-        let path = entry.path();
-        if path.is_dir() {
-            dirs.push(path);
-        }
-    }
+        .filter_map(|entry| {
+            let path = entry.path();
+            path.is_dir().then_some(path)
+        })
+        .collect();
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
