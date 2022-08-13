@@ -1,6 +1,13 @@
-# git-kamino
+# kamino
 
-This program helps manage a bunch of repo clones, like when you are working on many repos synced between multiple
-machines. It checks for repos that need to be committed (changes in working copy), pushed (local commits not
-on the remote) or pulled (remote is ahead of local). It doesn't actually resolve any of those things for you -
-just tell you that something needs to be done.
+`kamino` helps manage a bunch of git repo clones. Specifically, it helps when you are working on repos on multiple
+machines which which you keep in sync with the same remote server.
+
+It tells you which repos aren't in sync with the remote:
+- If there are uncommitted changes, in the working copy or the index (maybe you forgot to commit?)
+- If there are local commits not on the remote (maybe you forgot to push?)
+- If the remote is ahead of local (maybe you forgot to pull?)
+
+This program doesn't actually fix any of the above conditions, because it doesn't know what you want to do about it. It just tells you that you may want to do something.
+
+`kamino` scans for git repos within the directory you provide. Currently, this is a shallow scan that only looks one layer deep.

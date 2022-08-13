@@ -90,14 +90,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-kamino"
-version = "0.1.0"
-dependencies = [
- "clap",
- "git2",
-]
-
-[[package]]
 name = "git2"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,6 +153,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af25a77299a7f711a01975c35a6a424eb6862092cc2d6c72c4ed6cbc56dfc1fa"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "kamino"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "git2",
 ]
 
 [[package]]
