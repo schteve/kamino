@@ -17,8 +17,8 @@ fn main() {
 
     // Get all dir entries in given dir
     let mut dirs = Vec::new();
-    for entry in read_dir(args.dir)
-        .expect("Given path is not a directory: {dir}")
+    for entry in read_dir(&args.dir)
+        .unwrap_or_else(|_| panic!("Given path is not a directory: {}", args.dir.display()))
         .flatten()
     {
         let path = entry.path();
@@ -34,7 +34,7 @@ fn main() {
             if check_uncommitted(&repo) {
                 if !printed_header {
                     printed_header = true;
-                    println!("Repo in {dir:?}:");
+                    println!("Repo in {:?}:", dir.file_name().unwrap());
                 }
                 println!("    Has uncommitted changes");
             }
@@ -45,7 +45,7 @@ fn main() {
                     if ahead > 0 {
                         if !printed_header {
                             printed_header = true;
-                            println!("Repo in {dir:?}:");
+                            println!("Repo in {:?}:", dir.file_name().unwrap());
                         }
                         println!(
                             "    Branch {} is ahead of {} by {} commits",
@@ -60,7 +60,7 @@ fn main() {
                     if behind > 0 {
                         if !printed_header {
                             printed_header = true;
-                            println!("Repo in {dir:?}:");
+                            println!("Repo in {:?}:", dir.file_name().unwrap());
                         }
                         println!(
                             "    Branch {} is behind {} by {} commits",
@@ -86,7 +86,7 @@ fn check_uncommitted(repo: &Repository) -> bool {
 
     let statuses = repo
         .statuses(Some(&mut status_opts))
-        .expect("Error getting repo status");
+        .unwrap_or_else(|_| panic!("Error getting repo status for {:?}", repo.path()));
     !statuses.is_empty()
     /*if !statuses.is_empty() {
         for s in statuses.iter() {
