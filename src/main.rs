@@ -1,5 +1,5 @@
 use clap::Parser;
-use git2::{BranchType, Repository, StatusOptions};
+use git2::{BranchType, Oid, Repository, StatusOptions};
 use std::{fs::read_dir, path::PathBuf};
 
 #[derive(Parser)]
@@ -56,6 +56,19 @@ fn main() {
                 println!("    Has uncommitted changes");
             }
 
+            let repo = {
+                // Unfortunately checking the stash takes a mut ref to the repository although
+                // it doesn't seem to actually modify anything. Since none of this program wants
+                // to modify the repo we scope the mut ref.
+                let mut repo = repo;
+                let stashed = check_stashed(&mut repo);
+                if stashed > 0 {
+                    print_header.do_once();
+                    println!("    Has {stashed} stashed changes");
+                }
+                repo
+            };
+
             let ahead_behinds = check_ahead_behind(&repo);
             for ab in ahead_behinds {
                 if let Some(ahead) = ab.ahead {
@@ -85,8 +98,6 @@ fn main() {
         }
     }
 
-    // TODO: also check stashes?
-
     println!("Kamino scans complete!");
 }
 
@@ -104,6 +115,19 @@ fn check_uncommitted(repo: &Repository) -> bool {
             println!("    {}", s.path().unwrap()); // TODO: use logging
         }
     }*/
+}
+
+// Check if there are any stashed changes.
+fn check_stashed(repo: &mut Repository) -> u32 {
+    let mut stash_count = 0;
+
+    let cb = |_index: usize, _msg: &str, _id: &Oid| -> bool {
+        stash_count += 1;
+        true
+    };
+    repo.stash_foreach(cb).expect("Checking the stash failed");
+
+    stash_count
 }
 
 struct AheadBehind {
