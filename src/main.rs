@@ -113,11 +113,6 @@ fn check_uncommitted(repo: &Repository) -> bool {
         .statuses(Some(&mut status_opts))
         .unwrap_or_else(|_| panic!("Error getting repo status for {:?}", repo.path()));
     !statuses.is_empty()
-    /*if !statuses.is_empty() {
-        for s in statuses.iter() {
-            println!("    {}", s.path().unwrap()); // TODO: use logging
-        }
-    }*/
 }
 
 // Check if there are any stashed changes.
@@ -189,39 +184,6 @@ fn git_cred_check(
     allowed_types: CredentialType,
 ) -> Result<Cred, Error> {
     assert_eq!(allowed_types, CredentialType::USER_PASS_PLAINTEXT);
-
-    /*
-    Attempt to make a credential reader before I realized credential_helper() was a thing. Keeping till I'm sure it's not needed.
-    let url = Url::parse(url).unwrap_or_else(|_| panic!("Couldn't parse url \"{url}\""));
-    let protocol = url.scheme();
-    let host = url.host_str().unwrap_or_else(|| panic!("Couldn't find host name in url \"{url}\""));
-    let protocol_str = format!("protocol={}", protocol);
-    let host_str = format!("host={}", host);
-    let fill_str = [protocol_str, host_str].join("\n");
-    dbg!(&fill_str);
-
-    let mut child = Command::new("git")
-        .args(["credential", "fill"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("Couldn't spawn git process");
-
-    let child_stdin = child.stdin.as_mut().expect("Couldn't get stdin on child process");
-    child_stdin.write_all(fill_str.as_bytes()).expect("Write to stdin failed");
-
-    let output = child.wait_with_output().expect("Process execution / wait failed");
-    let output_str = String::from_utf8(output.stdout).expect("Process output is not utf8");
-    let mut password = None;
-    for line in output_str.lines() {
-        let (key, value) = line.split_once('=').unwrap_or_else(|| panic!("Couldn't split line {line}"));
-        if matches!(key, "password") {
-            password = Some(value);
-        }
-    }
-    dbg!(output_str);
-
-    todo!()*/
 
     let config_path = Config::find_global().expect("Couldn't find global git configuration");
     let config = Config::open(&config_path)
