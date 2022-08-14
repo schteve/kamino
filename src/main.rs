@@ -1,5 +1,8 @@
 use clap::Parser;
-use git2::{BranchType, Oid, Repository, StatusOptions};
+use git2::{
+    BranchType, Config, Cred, CredentialType, Error, FetchOptions, Oid, RemoteCallbacks,
+    Repository, StatusOptions,
+};
 use std::{fs::read_dir, path::PathBuf};
 
 #[derive(Parser)]
@@ -139,8 +142,18 @@ struct AheadBehind {
 
 // Check if local is ahead or behind remote
 fn check_ahead_behind(repo: &Repository) -> Vec<AheadBehind> {
-    // TODO: Fetch from origin first to make sure upstream is accurate.
+    // Fetch from origin first to make sure upstream is accurate.
     // If your remote isn't origin then tough luck.
+    if let Ok(mut remote) = repo.find_remote("origin") {
+        let refspecs: &[&str] = &[]; // Use base refspecs, which I assume means all local branches
+        let mut cbs = RemoteCallbacks::new();
+        cbs.credentials(git_cred_check);
+        let mut opts = FetchOptions::new();
+        opts.remote_callbacks(cbs);
+        remote
+            .fetch(refspecs, Some(&mut opts), None)
+            .expect("Fetch on origin failed");
+    }
 
     repo.branches(Some(BranchType::Local))
         .unwrap()
@@ -167,4 +180,51 @@ fn check_ahead_behind(repo: &Repository) -> Vec<AheadBehind> {
             }
         })
         .collect()
+}
+
+// Credential check callback for providing credentials when working with an authenticated remote
+fn git_cred_check(
+    url: &str,
+    username: Option<&str>,
+    allowed_types: CredentialType,
+) -> Result<Cred, Error> {
+    assert_eq!(allowed_types, CredentialType::USER_PASS_PLAINTEXT);
+
+    /*
+    Attempt to make a credential reader before I realized credential_helper() was a thing. Keeping till I'm sure it's not needed.
+    let url = Url::parse(url).unwrap_or_else(|_| panic!("Couldn't parse url \"{url}\""));
+    let protocol = url.scheme();
+    let host = url.host_str().unwrap_or_else(|| panic!("Couldn't find host name in url \"{url}\""));
+    let protocol_str = format!("protocol={}", protocol);
+    let host_str = format!("host={}", host);
+    let fill_str = [protocol_str, host_str].join("\n");
+    dbg!(&fill_str);
+
+    let mut child = Command::new("git")
+        .args(["credential", "fill"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Couldn't spawn git process");
+
+    let child_stdin = child.stdin.as_mut().expect("Couldn't get stdin on child process");
+    child_stdin.write_all(fill_str.as_bytes()).expect("Write to stdin failed");
+
+    let output = child.wait_with_output().expect("Process execution / wait failed");
+    let output_str = String::from_utf8(output.stdout).expect("Process output is not utf8");
+    let mut password = None;
+    for line in output_str.lines() {
+        let (key, value) = line.split_once('=').unwrap_or_else(|| panic!("Couldn't split line {line}"));
+        if matches!(key, "password") {
+            password = Some(value);
+        }
+    }
+    dbg!(output_str);
+
+    todo!()*/
+
+    let config_path = Config::find_global().expect("Couldn't find global git configuration");
+    let config = Config::open(&config_path)
+        .unwrap_or_else(|_| panic!("Couldn't open git config file {config_path:?}"));
+    Cred::credential_helper(&config, url, username)
 }
