@@ -53,14 +53,7 @@ fn main() {
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
-            let mut print_header = DoOnce::new(|| {
-                println!(
-                    "{}:",
-                    dir.file_name()
-                        .unwrap_or_else(|| panic!("No file name for {dir:?}"))
-                        .to_string_lossy()
-                )
-            });
+            let mut print_header = DoOnce::new(|| println!("{}:", dir.to_string_lossy()));
 
             if check_uncommitted(&repo) {
                 print_header.do_once();
