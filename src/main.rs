@@ -201,8 +201,6 @@ fn git_cred_check(
 ) -> Result<Cred, Error> {
     assert_eq!(allowed_types, CredentialType::USER_PASS_PLAINTEXT);
 
-    let config_path = Config::find_global().expect("Couldn't find global git configuration");
-    let config = Config::open(&config_path)
-        .unwrap_or_else(|_| panic!("Couldn't open git config file {config_path:?}"));
+    let config = Config::open_default().expect("Couldn't find default git configuration");
     Cred::credential_helper(&config, url, username)
 }
