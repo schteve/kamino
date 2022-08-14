@@ -8,7 +8,8 @@ It tells you which repos aren't in sync with the remote:
 - If there are stashed changes (maybe you wanted to apply them?)
 - If there are local commits not on the remote (maybe you forgot to push?)
 - If the remote is ahead of local (maybe you forgot to pull?)
+- If the git hooks in `.githooks` (if present) match the ones in `.git/hooks` (maybe you forgot to install / update a hook? maybe you have an active hook that should go into the repo?). This only checks the working copy and ignores `.sample` files.
 
-This program doesn't actually fix any of the above conditions, because it doesn't know what you want to do about it. It just tells you that you may want to do something.
+This program doesn't actually fix any of the above conditions, because it doesn't know what you want to do about it. It just tells you that you may want to do something. Note that to check local vs remote it performs a fetch.
 
 `kamino` scans for git repos within the directory you provide. Currently, this is a shallow scan that only looks one layer deep.

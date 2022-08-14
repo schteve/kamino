@@ -3,7 +3,13 @@ use git2::{
     BranchType, Config, Cred, CredentialType, Error, FetchOptions, Oid, RemoteCallbacks,
     Repository, StatusOptions,
 };
-use std::{fs::read_dir, path::PathBuf};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::HashSet,
+    ffi::{OsStr, OsString},
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Parser)]
 struct Args {
@@ -42,7 +48,7 @@ fn main() {
     );
 
     // Get all dir entries in given dir
-    let dirs: Vec<PathBuf> = read_dir(&args.dir)
+    let dirs: Vec<PathBuf> = fs::read_dir(&args.dir)
         .unwrap_or_else(|_| panic!("Given path is not a directory: {}", args.dir.display()))
         .flatten()
         .filter_map(|entry| {
@@ -73,8 +79,7 @@ fn main() {
                 repo
             };
 
-            let ahead_behinds = check_ahead_behind(&repo);
-            for ab in ahead_behinds {
+            for ab in check_ahead_behind(&repo) {
                 if let Some(ahead) = ab.ahead {
                     if ahead > 0 {
                         print_header.do_once();
@@ -97,6 +102,27 @@ fn main() {
                             behind,
                         );
                     }
+                }
+            }
+
+            for hook in check_hooks(&repo) {
+                match hook.state {
+                    HookState::ActiveOnly => {
+                        print_header.do_once();
+                        println!("    Hook {:?} only appears in .git/hooks", hook.name);
+                    }
+                    HookState::InRepoOnly => {
+                        print_header.do_once();
+                        println!("    Hook {:?} only appears in .githooks", hook.name);
+                    }
+                    HookState::Mismatch => {
+                        print_header.do_once();
+                        println!(
+                            "    Hook {:?} is different in .git/hooks and .githooks",
+                            hook.name
+                        );
+                    }
+                    HookState::Good => (),
                 }
             }
         }
@@ -268,3 +294,86 @@ fn git_cred_check(
     )
 }
 */
+
+enum HookState {
+    ActiveOnly, // Only in .git/hooks
+    InRepoOnly, // Only in .githooks
+    Mismatch,   // In both locations but file contents don't match
+    Good,       // In both locations and file contents match
+}
+
+struct Hook {
+    name: OsString,
+    state: HookState,
+}
+
+// Check whether git hooks match up in .githooks and .git/hooks
+// Note that repo.path() points to the .git directory
+fn check_hooks(repo: &Repository) -> Vec<Hook> {
+    let active_dir = repo.path().join("hooks/");
+    let active_hooks = hook_filenames_in_dir(&active_dir);
+
+    let in_repo_dir = repo.path().join("../.githooks/");
+    let in_repo_hooks = hook_filenames_in_dir(&in_repo_dir);
+
+    let mut output = Vec::new();
+
+    // Hooks in both - compare file contents
+    let in_both: HashSet<_> = active_hooks.intersection(&in_repo_hooks).cloned().collect();
+    for path in &in_both {
+        let active_path = repo.path().join("hooks/").join(path);
+        let active_bytes =
+            fs::read(&active_path).unwrap_or_else(|_| panic!("Couldn't open file {active_path:?}"));
+        let active_hash = Sha256::digest(active_bytes);
+
+        let in_repo_path = repo.path().join("../.githooks/").join(path);
+        let in_repo_bytes = fs::read(&in_repo_path)
+            .unwrap_or_else(|_| panic!("Couldn't open file {in_repo_path:?}"));
+        let in_repo_hash = Sha256::digest(in_repo_bytes);
+
+        let state = if active_hash == in_repo_hash {
+            HookState::Good
+        } else {
+            HookState::Mismatch
+        };
+        output.push(Hook {
+            name: path.clone(),
+            state,
+        });
+    }
+
+    // Hooks just in active dir
+    for path in active_hooks.difference(&in_both) {
+        output.push(Hook {
+            name: path.clone(),
+            state: HookState::ActiveOnly,
+        });
+    }
+
+    // Hooks just in repo
+    for path in in_repo_hooks.difference(&in_both) {
+        output.push(Hook {
+            name: path.clone(),
+            state: HookState::InRepoOnly,
+        });
+    }
+
+    output
+}
+
+// Get a list of git hook filenames in the given directory.
+// Ignores .sample files.
+fn hook_filenames_in_dir(dir: &Path) -> HashSet<OsString> {
+    if let Ok(contents) = fs::read_dir(dir) {
+        contents
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.is_file())
+            .filter(|path| path.extension() != Some(OsStr::new("sample")))
+            .filter_map(|path| path.file_name().map(|s| s.to_owned()))
+            .collect()
+    } else {
+        // If directory isn't present just report that it has no files
+        HashSet::new()
+    }
+}
