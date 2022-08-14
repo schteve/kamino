@@ -204,3 +204,74 @@ fn git_cred_check(
     let config = Config::open_default().expect("Couldn't find default git configuration");
     Cred::credential_helper(&config, url, username)
 }
+
+/*
+    This was an earlier implementation for git_cred_check() which uses commands to access the credential
+    manager. I'm keeping the credential_helper() implementation in place but keeping this nearby since
+    I suspect it might be needed in the future. If credential_helper() fails try using this.
+        - Add url crate
+
+fn git_cred_check(
+    url: &str,
+    _username: Option<&str>,
+    allowed_types: CredentialType,
+) -> Result<Cred, Error> {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
+    use url::Url;
+
+    assert_eq!(allowed_types, CredentialType::USER_PASS_PLAINTEXT);
+
+    let url = Url::parse(url).unwrap_or_else(|_| panic!("Couldn't parse url \"{url}\""));
+    let protocol = url.scheme();
+    let host = url
+        .host_str()
+        .unwrap_or_else(|| panic!("Couldn't find host name in url \"{url}\""));
+    let protocol_str = format!("protocol={}", protocol);
+    let host_str = format!("host={}", host);
+    let fill_str = [protocol_str, host_str].join("\n");
+
+    // Create a child process where the stdin and stdout are accessible to us
+    let mut child = Command::new("git")
+        .args(["credential", "fill"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Couldn't spawn git process");
+
+    // Write the input to stdin
+    let child_stdin = child
+        .stdin
+        .as_mut()
+        .expect("Couldn't get stdin on child process");
+    child_stdin
+        .write_all(fill_str.as_bytes())
+        .expect("Write to stdin failed");
+
+    // Wait for the process to complete
+    let output = child
+        .wait_with_output()
+        .expect("Process execution / wait failed");
+    let output_str = String::from_utf8(output.stdout).expect("Process output is not utf8");
+
+    let mut username = None;
+    let mut password = None;
+    for line in output_str.lines() {
+        let (key, value) = line
+            .split_once('=')
+            .unwrap_or_else(|| panic!("Couldn't split line {line}"));
+        match key {
+            "username" => username = Some(value),
+            "password" => password = Some(value),
+            _ => (),
+        }
+    }
+
+    Cred::userpass_plaintext(
+        username.expect("Couldn't find username"),
+        password.expect("Couldn't find password"),
+    )
+}
+*/
