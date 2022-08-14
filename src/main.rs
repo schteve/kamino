@@ -36,7 +36,9 @@ fn main() {
 
     println!(
         "Kamino scanning repos in {:?}",
-        args.dir.canonicalize().unwrap()
+        args.dir
+            .canonicalize()
+            .unwrap_or_else(|_| panic!("Failed to canonicalize {:?}", args.dir)),
     );
 
     // Get all dir entries in given dir
@@ -51,8 +53,14 @@ fn main() {
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
-            let mut print_header =
-                DoOnce::new(|| println!("{}:", dir.file_name().unwrap().to_string_lossy()));
+            let mut print_header = DoOnce::new(|| {
+                println!(
+                    "{}:",
+                    dir.file_name()
+                        .unwrap_or_else(|| panic!("No file name for {dir:?}"))
+                        .to_string_lossy()
+                )
+            });
 
             if check_uncommitted(&repo) {
                 print_header.do_once();
@@ -151,14 +159,22 @@ fn check_ahead_behind(repo: &Repository) -> Vec<AheadBehind> {
     }
 
     repo.branches(Some(BranchType::Local))
-        .unwrap()
+        .expect("Failed to get list of local branches")
         .flatten()
         .map(|(local, _)| {
             if let Ok(upstream) = local.upstream() {
                 // We have an upstream, so check the graph difference between it and the local
-                let local_oid = local.get().target().unwrap();
-                let upstream_oid = upstream.get().target().unwrap();
-                let (ahead, behind) = repo.graph_ahead_behind(local_oid, upstream_oid).unwrap();
+                let local_oid = local
+                    .get()
+                    .target()
+                    .expect("Failed to get OID of local branch");
+                let upstream_oid = upstream
+                    .get()
+                    .target()
+                    .expect("Failed to get OID of upstream branch");
+                let (ahead, behind) = repo
+                    .graph_ahead_behind(local_oid, upstream_oid)
+                    .expect("Error while checking graph ahead/behind");
                 AheadBehind {
                     ahead: Some(ahead),
                     behind: Some(behind),
