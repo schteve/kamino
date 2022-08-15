@@ -9,32 +9,12 @@ use std::{
     ffi::{OsStr, OsString},
     fs,
     path::{Path, PathBuf},
+    sync::Once,
 };
 
 #[derive(Parser)]
 struct Args {
     dir: PathBuf,
-}
-
-struct DoOnce<F> {
-    done: bool,
-    f: F,
-}
-
-impl<F> DoOnce<F>
-where
-    F: FnMut(),
-{
-    fn new(f: F) -> Self {
-        Self { done: false, f }
-    }
-
-    fn do_once(&mut self) {
-        if !self.done {
-            self.done = true;
-            (self.f)();
-        }
-    }
 }
 
 fn main() {
@@ -59,10 +39,12 @@ fn main() {
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
-            let mut print_header = DoOnce::new(|| println!("{}:", dir.to_string_lossy()));
+            let once = Once::new();
+            let print_header_once =
+                move || once.call_once(|| println!("{}:", dir.to_string_lossy()));
 
             if check_uncommitted(&repo) {
-                print_header.do_once();
+                print_header_once();
                 println!("    Has uncommitted changes");
             }
 
@@ -73,7 +55,7 @@ fn main() {
                 let mut repo = repo;
                 let stashed = check_stashed(&mut repo);
                 if stashed > 0 {
-                    print_header.do_once();
+                    print_header_once();
                     println!("    Has {stashed} stashed changes");
                 }
                 repo
@@ -82,7 +64,7 @@ fn main() {
             for ab in check_ahead_behind(&repo) {
                 if let Some(ahead) = ab.ahead {
                     if ahead > 0 {
-                        print_header.do_once();
+                        print_header_once();
                         println!(
                             "    Branch {} is ahead of {} by {} commits",
                             ab.branch_name.as_deref().unwrap_or("(unnamed??)"),
@@ -94,7 +76,7 @@ fn main() {
 
                 if let Some(behind) = ab.behind {
                     if behind > 0 {
-                        print_header.do_once();
+                        print_header_once();
                         println!(
                             "    Branch {} is behind {} by {} commits",
                             ab.branch_name.as_deref().unwrap_or("(unnamed??)"),
@@ -108,15 +90,15 @@ fn main() {
             for hook in check_hooks(&repo) {
                 match hook.state {
                     HookState::ActiveOnly => {
-                        print_header.do_once();
+                        print_header_once();
                         println!("    Hook {:?} only appears in .git/hooks", hook.name);
                     }
                     HookState::InRepoOnly => {
-                        print_header.do_once();
+                        print_header_once();
                         println!("    Hook {:?} only appears in .githooks", hook.name);
                     }
                     HookState::Mismatch => {
-                        print_header.do_once();
+                        print_header_once();
                         println!(
                             "    Hook {:?} is different in .git/hooks and .githooks",
                             hook.name
