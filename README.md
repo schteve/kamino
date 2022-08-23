@@ -1,3 +1,5 @@
+[![CI](https://github.com/schteve/kamino/actions/workflows/ci.yml/badge.svg)](https://github.com/schteve/kamino/actions/workflows/ci.yml)
+
 # kamino
 
 `kamino` helps manage a bunch of git repo clones. Specifically, it helps when you are working on repos on multiple
