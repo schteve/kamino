@@ -12,7 +12,19 @@ categories = ["command-line-interface", "development-tools"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+static_ssl = ['openssl/vendored']
+
 [dependencies]
 clap = { version = "3.2.17", features = ["derive"] }
 git2 = "0.15.0"
 sha2 = "0.10.2"
+
+[dependencies.openssl]
+# If compiling on a system without OpenSSL installed, or cross-compiling for a different
+# architecture, enable this feature to compile OpenSSL as part of the build.
+# See https://docs.rs/openssl/#vendored for more.
+# Also see https://stackoverflow.com/questions/54775076/how-to-cross-compile-a-rust-project-with-openssl
+version = "*"
+features = ["vendored"]
+optional = true # Don't enable on a normal build, only use vendored if it's manually enabled
