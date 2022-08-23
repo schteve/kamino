@@ -2,6 +2,13 @@
 name = "kamino"
 version = "0.1.0"
 edition = "2021"
+authors = ["Steve Heindel <stevenheindel@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Help manage a bunch of git repo clones by ensuring they are in sync with the remote."
+repository = "https://github.com/schteve/kamino"
+readme = "README.md"
+keywords = ["git", "repo", "sync"]
+categories = ["command-line-interface", "development-tools"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

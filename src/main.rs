@@ -1,3 +1,5 @@
+#![deny(unsafe_code)]
+
 use clap::Parser;
 use git2::{
     BranchType, Config, Cred, CredentialType, Error, FetchOptions, Oid, RemoteCallbacks,
@@ -13,6 +15,7 @@ use std::{
 };
 
 #[derive(Parser)]
+#[clap(author, version, about, long_about = None)] // Read from `Cargo.toml`
 struct Args {
     dir: PathBuf,
 }

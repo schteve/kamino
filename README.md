@@ -13,3 +13,20 @@ It tells you which repos aren't in sync with the remote:
 This program doesn't actually fix any of the above conditions, because it doesn't know what you want to do about it. It just tells you that you may want to do something. Note that to check local vs remote it performs a fetch.
 
 `kamino` scans for git repos within the directory you provide. Currently, this is a shallow scan that only looks one layer deep.
+
+# License
+
+Licensed under either of
+
+ * Apache License, Version 2.0
+   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license
+   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+# Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
