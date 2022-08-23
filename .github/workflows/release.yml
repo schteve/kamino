@@ -1,0 +1,66 @@
+name: Create release
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-pc-windows-gnu, x86_64-unknown-linux-gnu]
+    steps:
+    - name: Clone
+      uses: actions/checkout@v2
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+        components: rustfmt, clippy
+    - name: Install cross deps
+      run: |
+        if [[ ${{ matrix.target }} == "x86_64-pc-windows-gnu" ]]; then
+          sudo apt-get install gcc-mingw-w64
+        fi
+    - name: Check
+      run: cargo fmt -- --check
+    - name: Build
+      run: cargo build --release --target=${{ matrix.target }} --features openssl/vendored --verbose
+    - name: Clippy
+      run: cargo clippy --release -- -Dwarnings
+    - name: Bundle
+      run: |
+        TARGET_FILE=target/${{ matrix.target }}/release/kamino
+        if [[ ${{ matrix.target }} == *"windows"* ]]; then
+          TARGET_FILE=${TARGET_FILE}.exe
+        fi
+
+        mkdir bundle
+        cp $TARGET_FILE bundle/
+        cp CHANGELOG.md bundle/
+        cp LICENSE* bundle/
+        cp README.md bundle/
+
+        cd bundle
+
+        RELEASE_VERSION=${GITHUB_REF#refs/tags/}
+        ARCHIVE_NAME="kamino-$RELEASE_VERSION-${{ matrix.target }}"
+
+        if [[ ${{ matrix.target }} == *"windows"* ]]; then
+          ARCHIVE_NAME=${ARCHIVE_NAME}.zip
+          zip ../$ARCHIVE_NAME *
+        else
+          ARCHIVE_NAME=${ARCHIVE_NAME}.tar.gz
+          tar cvzf ../$ARCHIVE_NAME *
+        fi
+        echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV # Pass variable to next step
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ env.ARCHIVE_NAME }}
