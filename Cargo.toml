@@ -25,6 +25,6 @@ sha2 = "0.10.2"
 # architecture, enable this feature to compile OpenSSL as part of the build.
 # See https://docs.rs/openssl/#vendored for more.
 # Also see https://stackoverflow.com/questions/54775076/how-to-cross-compile-a-rust-project-with-openssl
-version = "*"
+version = "0"
 features = ["vendored"]
 optional = true # Don't enable on a normal build, only use vendored if it's manually enabled
