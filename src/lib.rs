@@ -45,7 +45,7 @@ pub struct AheadBehind {
 }
 
 // Check if local is ahead or behind remote
-pub fn check_ahead_behind(repo: &Repository) -> Vec<AheadBehind> {
+pub fn check_ahead_behind(repo: &Repository) -> impl Iterator<Item = AheadBehind> + '_ {
     // Fetch from origin first to make sure upstream is accurate.
     // If your remote isn't origin then tough luck.
     if let Ok(mut remote) = repo.find_remote("origin") {
@@ -91,7 +91,6 @@ pub fn check_ahead_behind(repo: &Repository) -> Vec<AheadBehind> {
                 }
             }
         })
-        .collect()
 }
 
 // Credential check callback for providing credentials when working with an authenticated remote
@@ -193,10 +192,10 @@ pub struct Hook {
 // Note that repo.path() points to the .git directory
 pub fn check_hooks(repo: &Repository) -> Vec<Hook> {
     let active_dir = repo.path().join("hooks/");
-    let active_hooks = hook_filenames_in_dir(&active_dir);
+    let active_hooks: HashSet<_> = hook_filenames_in_dir(&active_dir).collect();
 
     let in_repo_dir = repo.path().join("../.githooks/");
-    let in_repo_hooks = hook_filenames_in_dir(&in_repo_dir);
+    let in_repo_hooks: HashSet<_> = hook_filenames_in_dir(&in_repo_dir).collect();
 
     let mut output = Vec::new();
 
@@ -245,17 +244,14 @@ pub fn check_hooks(repo: &Repository) -> Vec<Hook> {
 
 // Get a list of git hook filenames in the given directory.
 // Ignores .sample files.
-pub fn hook_filenames_in_dir(dir: &Path) -> HashSet<OsString> {
-    if let Ok(contents) = fs::read_dir(dir) {
-        contents
-            .flatten()
-            .map(|entry| entry.path())
-            .filter(|path| path.is_file())
-            .filter(|path| path.extension() != Some(OsStr::new("sample")))
-            .filter_map(|path| path.file_name().map(|s| s.to_owned()))
-            .collect()
-    } else {
-        // If directory isn't present just report that it has no files
-        HashSet::new()
-    }
+// If directory isn't present just report that it has no files
+fn hook_filenames_in_dir(dir: &Path) -> impl Iterator<Item = OsString> + '_ {
+    fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .filter(|path| path.extension() != Some(OsStr::new("sample")))
+        .filter_map(|path| path.file_name().map(|s| s.to_owned()))
 }
