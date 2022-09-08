@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![deny(missing_docs)]
 #![deny(unsafe_code)]
 
 use git2::{
@@ -13,7 +14,8 @@ use std::{
     path::Path,
 };
 
-// Check if there are any uncommitted local changes
+/// Check if there are any uncommitted local changes
+#[must_use]
 pub fn check_uncommitted(repo: &Repository) -> bool {
     let mut status_opts = StatusOptions::new();
     status_opts.include_ignored(false).include_untracked(true);
@@ -24,7 +26,8 @@ pub fn check_uncommitted(repo: &Repository) -> bool {
     !statuses.is_empty()
 }
 
-// Check if there are any stashed changes.
+/// Check if there are any stashed changes.
+#[must_use]
 pub fn check_stashed(repo: &mut Repository) -> u32 {
     let mut stash_count = 0;
 
@@ -37,17 +40,22 @@ pub fn check_stashed(repo: &mut Repository) -> u32 {
     stash_count
 }
 
+/// Contains details about the state of a branch relative to the remote server.
 pub struct AheadBehind {
+    /// The number of commits this branch is ahead of the remote server, or None if no upstream branch is detected.
     pub ahead: Option<usize>,
+    /// The number of commits this branch is behind the remote server, or None if no upstream branch is detected.
     pub behind: Option<usize>,
+    /// The name of this branch, or None if the name would not be a valid String (not UTF-8 for example).
     pub branch_name: Option<String>,
+    /// The name of the upstream branch, or None if it is not detected.
     pub upstream_name: Option<String>,
 }
 
-// Check if local is ahead or behind remote
+/// Check if local is ahead or behind remote
+/// Fetch from origin first to make sure upstream is accurate.
+/// If your remote isn't origin then tough luck.
 pub fn check_ahead_behind(repo: &Repository) -> impl Iterator<Item = AheadBehind> + '_ {
-    // Fetch from origin first to make sure upstream is accurate.
-    // If your remote isn't origin then tough luck.
     if let Ok(mut remote) = repo.find_remote("origin") {
         let refspecs: &[&str] = &[]; // Use base refspecs, which I assume means all local branches
         let mut cbs = RemoteCallbacks::new();
@@ -79,14 +87,14 @@ pub fn check_ahead_behind(repo: &Repository) -> impl Iterator<Item = AheadBehind
                 AheadBehind {
                     ahead: Some(ahead),
                     behind: Some(behind),
-                    branch_name: local.name().ok().flatten().map(|x| x.to_owned()),
-                    upstream_name: upstream.name().ok().flatten().map(|x| x.to_owned()),
+                    branch_name: local.name().ok().flatten().map(ToOwned::to_owned),
+                    upstream_name: upstream.name().ok().flatten().map(ToOwned::to_owned),
                 }
             } else {
                 AheadBehind {
                     ahead: None,
                     behind: None,
-                    branch_name: local.name().ok().flatten().map(|x| x.to_owned()),
+                    branch_name: local.name().ok().flatten().map(ToOwned::to_owned),
                     upstream_name: None,
                 }
             }
@@ -94,7 +102,7 @@ pub fn check_ahead_behind(repo: &Repository) -> impl Iterator<Item = AheadBehind
 }
 
 // Credential check callback for providing credentials when working with an authenticated remote
-pub fn git_cred_check(
+fn git_cred_check(
     url: &str,
     username: Option<&str>,
     allowed_types: CredentialType,
@@ -176,21 +184,32 @@ fn git_cred_check(
 }
 */
 
+/// Indicates the state of a single git hook
 pub enum HookState {
-    ActiveOnly, // Only in .git/hooks
-    InRepoOnly, // Only in .githooks
-    Mismatch,   // In both locations but file contents don't match
-    Good,       // In both locations and file contents match
+    /// Only in .git/hooks
+    ActiveOnly,
+    /// Only in .githooks
+    InRepoOnly,
+    /// In both locations but file contents don't match
+    Mismatch,
+    /// In both locations and file contents match
+    Good,
 }
 
+/// Contains the name and state of a single git hook.
 pub struct Hook {
+    /// The filename of the git hook (the same name in .git/hooks and .githooks)
     pub name: OsString,
+    /// The state of the git hook
     pub state: HookState,
 }
 
-// Check whether git hooks match up in .githooks and .git/hooks
-// Note that repo.path() points to the .git directory
+/// Check whether git hooks match up in .githooks and .git/hooks
+/// Ignore files that end with `.sample`.
+/// For each hook found, give the filename and state of it.
+#[must_use]
 pub fn check_hooks(repo: &Repository) -> Vec<Hook> {
+    // Note that repo.path() points to the .git directory
     let active_dir = repo.path().join("hooks/");
     let active_hooks: HashSet<_> = hook_filenames_in_dir(&active_dir).collect();
 
@@ -253,5 +272,5 @@ fn hook_filenames_in_dir(dir: &Path) -> impl Iterator<Item = OsString> + '_ {
         .map(|entry| entry.path())
         .filter(|path| path.is_file())
         .filter(|path| path.extension() != Some(OsStr::new("sample")))
-        .filter_map(|path| path.file_name().map(|s| s.to_owned()))
+        .filter_map(|path| path.file_name().map(ToOwned::to_owned))
 }
