@@ -33,9 +33,10 @@ fn main() {
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
-            let once = Once::new();
-            let print_header_once =
-                move || once.call_once(|| println!("{}:", dir.to_string_lossy()));
+            let print_header_once = {
+                let once = Once::new();
+                move || once.call_once(|| println!("{}:", dir.to_string_lossy()))
+            };
 
             if kamino::check_uncommitted(&repo) {
                 print_header_once();
