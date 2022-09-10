@@ -3,7 +3,11 @@
 use clap::Parser;
 use git2::Repository;
 use kamino::HookState;
-use std::{fs, path::PathBuf, sync::Once};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Once,
+};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)] // Read from `Cargo.toml`
@@ -33,7 +37,7 @@ fn main() {
 
     for dir in dirs {
         if let Ok(repo) = Repository::open(&dir) {
-            if let Err(e) = check_repo(repo) {
+            if let Err(e) = check_repo(repo, &dir) {
                 eprintln!("Error: {}", e);
                 let mut source = e.source();
                 while let Some(cause) = source {
@@ -48,11 +52,10 @@ fn main() {
     println!("Kamino scans complete!");
 }
 
-fn check_repo(repo: Repository) -> anyhow::Result<()> {
+fn check_repo(repo: Repository, dir: &Path) -> anyhow::Result<()> {
     let print_header_once = {
         let once = Once::new();
-        let path = repo.path().display().to_string();
-        move || once.call_once(|| println!("{}:", path))
+        move || once.call_once(|| println!("{}:", dir.display()))
     };
 
     if kamino::check_uncommitted(&repo)? {
