@@ -14,21 +14,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Error type for `check_uncommitted()`
+/// Error type for [`check_uncommitted()`].
 #[derive(thiserror::Error, Debug)]
 #[error("failed getting repo status for {path}")]
 pub struct UncommittedError {
-    /// Path to the repo
+    /// Path to the repo.
     path: PathBuf,
-    /// Underlying error
+    /// Underlying error.
     source: git2::Error,
 }
 
-/// Check if there are any uncommitted local changes
+/// Check if there are any uncommitted local changes.
 ///
 /// # Errors
 ///
-/// See `UncommittedError`
+/// See [`UncommittedError`].
 pub fn check_uncommitted(repo: &Repository) -> Result<bool, UncommittedError> {
     let mut status_opts = StatusOptions::new();
     status_opts.include_ignored(false).include_untracked(true);
@@ -42,7 +42,7 @@ pub fn check_uncommitted(repo: &Repository) -> Result<bool, UncommittedError> {
     Ok(!statuses.is_empty())
 }
 
-/// Error type for `check_stashed()`
+/// Error type for [`check_stashed()`].
 #[derive(thiserror::Error, Debug)]
 #[error("failed to check the stash")]
 pub struct StashedError(#[source] git2::Error);
@@ -51,7 +51,7 @@ pub struct StashedError(#[source] git2::Error);
 ///
 /// # Errors
 ///
-/// Return `Error::Stash` if any of the stash queries fail.
+/// See [`StashedError`].
 pub fn check_stashed(repo: &mut Repository) -> Result<u32, StashedError> {
     let mut stash_count = 0;
 
@@ -76,29 +76,29 @@ pub struct AheadBehind {
     pub upstream_name: Option<String>,
 }
 
-/// Error type for `check_ahead_behind()`
+/// Error type for [`check_ahead_behind()`].
 #[derive(thiserror::Error, Debug)]
 #[error("failed to fetch origin")]
 pub struct AheadBehindError(#[source] git2::Error);
 
-/// Error type for the iterator returned from `check_ahead_behind()`
+/// Error type for the iterator returned from [`check_ahead_behind()`].
 #[derive(thiserror::Error, Debug)]
 pub enum AheadBehindIterError {
-    /// Failed to get OID of a branch
+    /// Failed to get OID of a branch.
     #[error("failed to get OID of branch {0}")]
     Oid(String),
 
-    /// Failed to check the commit graph
+    /// Failed to check the commit graph.
     #[error("Error while checking graph ahead/behind")]
     CommitGraph(#[source] git2::Error),
 }
 
-/// Check if local is ahead or behind remote
+/// Check if each local branch is ahead or behind the remote.
 /// Fetch from origin first to make sure upstream is accurate.
 ///
 /// # Errors
 ///
-/// See `AheadBehindError`
+/// See [`AheadBehindError`].
 pub fn check_ahead_behind<'a>(
     repo: &'a Repository,
     remote: &str,
@@ -152,12 +152,13 @@ pub fn check_ahead_behind<'a>(
         }))
 }
 
-// Helper function to get the branch name as a string, or None if not found.
+// Helper function to get the branch name as a string, or `None` if not found.
 fn branch_to_string(branch: &Branch) -> Option<String> {
     branch.name().ok().flatten().map(ToOwned::to_owned)
 }
 
-// Credential check callback for providing credentials when working with an authenticated remote
+// Credential check callback for providing credentials when working with an authenticated remote.
+//
 // There was an earlier implementation for git_cred_check() which uses commands to access the credential
 // manager. It worked, but was pretty verbose. Check the repo history if you need it.
 fn git_cred_check(
@@ -171,44 +172,44 @@ fn git_cred_check(
     Cred::credential_helper(&config, url, username)
 }
 
-/// Indicates the state of a single git hook
+/// Indicates the state of a single git hook.
 pub enum HookState {
-    /// Only in .git/hooks
+    /// Only in `.git/hooks`.
     ActiveOnly,
-    /// Only in .githooks
+    /// Only in `.githooks`.
     InRepoOnly,
-    /// In both locations but file contents don't match
+    /// In both locations but file contents don't match.
     Mismatch,
-    /// In both locations and file contents match
+    /// In both locations and file contents match.
     Good,
 }
 
 /// Contains the name and state of a single git hook.
 pub struct Hook {
-    /// The filename of the git hook (the same name in .git/hooks and .githooks)
+    /// The filename of the git hook (the same name in `.git/hooks` and `.githooks`).
     pub name: OsString,
-    /// The state of the git hook
+    /// The state of the git hook.
     pub state: HookState,
 }
 
-/// Error type for `check_hooks()`
+/// Error type for [`check_hooks()`].
 #[derive(thiserror::Error, Debug)]
 #[error("File IO failed on \"{filename}\"")]
-pub struct HooksError {
-    /// Filename that op failed on
+pub struct HookError {
+    /// Filename that op failed on.
     filename: PathBuf,
-    /// Underlying error
+    /// Underlying error.
     source: io::Error,
 }
 
-/// Check whether git hooks match up in .githooks and .git/hooks
+/// Check whether git hooks match up in `.githooks` and `.git/hooks`.
 /// Ignore files that end with `.sample`.
 /// For each hook found, give the filename and state of it.
 ///
 /// # Errors
 ///
-/// Return `Error::Io` if any file operation fails.
-pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, HooksError> {
+/// See [`HookError`].
+pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, HookError> {
     // Note that repo.path() points to the .git directory
     let active_dir = repo.path().join("hooks/");
     let active_hooks: HashSet<_> = hook_filenames_in_dir(&active_dir).collect();
@@ -222,14 +223,14 @@ pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, HooksError> {
     let in_both: HashSet<_> = active_hooks.intersection(&in_repo_hooks).cloned().collect();
     for path in &in_both {
         let active_path = repo.path().join("hooks/").join(path);
-        let active_bytes = fs::read(&active_path).map_err(|e| HooksError {
+        let active_bytes = fs::read(&active_path).map_err(|e| HookError {
             filename: active_path,
             source: e,
         })?;
         let active_hash = Sha256::digest(active_bytes);
 
         let in_repo_path = repo.path().join("../.githooks/").join(path);
-        let in_repo_bytes = fs::read(&in_repo_path).map_err(|e| HooksError {
+        let in_repo_bytes = fs::read(&in_repo_path).map_err(|e| HookError {
             filename: in_repo_path,
             source: e,
         })?;
@@ -267,7 +268,7 @@ pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, HooksError> {
 
 // Get a list of git hook filenames in the given directory.
 // Ignores .sample files.
-// If directory isn't present just report that it has no files
+// If directory isn't present just report that it has no files.
 fn hook_filenames_in_dir(dir: &Path) -> impl Iterator<Item = OsString> + '_ {
     fs::read_dir(dir)
         .into_iter()
