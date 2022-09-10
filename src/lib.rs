@@ -95,16 +95,16 @@ pub enum AheadBehindIterError {
 
 /// Check if local is ahead or behind remote
 /// Fetch from origin first to make sure upstream is accurate.
-/// If your remote isn't origin then tough luck.
 ///
 /// # Errors
 ///
 /// See `AheadBehindError`
-pub fn check_ahead_behind(
-    repo: &Repository,
-) -> Result<impl Iterator<Item = Result<AheadBehind, AheadBehindIterError>> + '_, AheadBehindError>
+pub fn check_ahead_behind<'a>(
+    repo: &'a Repository,
+    remote: &str,
+) -> Result<impl Iterator<Item = Result<AheadBehind, AheadBehindIterError>> + 'a, AheadBehindError>
 {
-    if let Ok(mut remote) = repo.find_remote("origin") {
+    if let Ok(mut remote) = repo.find_remote(remote) {
         let refspecs: &[&str] = &[]; // Use base refspecs, which I assume means all local branches
         let mut cbs = RemoteCallbacks::new();
         cbs.credentials(git_cred_check);

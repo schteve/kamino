@@ -76,7 +76,7 @@ fn check_repo(repo: Repository, dir: &Path) -> anyhow::Result<()> {
         repo
     };
 
-    for ab in kamino::check_ahead_behind(&repo)? {
+    for ab in kamino::check_ahead_behind(&repo, "origin")? {
         let ab = ab?;
 
         if let Some(ahead) = ab.ahead {
