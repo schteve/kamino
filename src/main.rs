@@ -3,7 +3,7 @@
 use clap::Parser;
 use git2::Repository;
 use kamino::HookState;
-use std::{error::Error, fs, path::PathBuf, sync::Once};
+use std::{fs, path::PathBuf, sync::Once};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)] // Read from `Cargo.toml`
@@ -35,8 +35,10 @@ fn main() {
         if let Ok(repo) = Repository::open(&dir) {
             if let Err(e) = check_repo(repo) {
                 eprintln!("Error: {}", e);
-                if let Some(source) = e.source() {
-                    eprintln!("Caused by: {}", source);
+                let mut source = e.source();
+                while let Some(cause) = source {
+                    eprintln!("Caused by: {}", cause);
+                    source = cause.source();
                 }
                 return;
             }
@@ -46,7 +48,7 @@ fn main() {
     println!("Kamino scans complete!");
 }
 
-fn check_repo(repo: Repository) -> Result<(), kamino::Error> {
+fn check_repo(repo: Repository) -> anyhow::Result<()> {
     let print_header_once = {
         let once = Once::new();
         let path = repo.path().display().to_string();

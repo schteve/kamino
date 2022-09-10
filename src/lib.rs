@@ -14,75 +14,52 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Various errors that can occur while using this library
+/// Error type for `check_uncommitted()`
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
-    /// Failed getting repo status
-    #[error("failed getting repo status for {path}")]
-    RepoStatus {
-        /// Path to the repo
-        path: PathBuf,
-        /// Underlying error
-        source: git2::Error,
-    },
-
-    /// Failed accessing the stash
-    #[error("failed to check the stash")]
-    Stash(#[source] git2::Error),
-
-    /// Failed to fetch origin
-    #[error("failed to fetch origin")]
-    FetchOrigin(#[source] git2::Error),
-
-    /// Failed to get OID of a branch
-    #[error("failed to get OID of branch {0}")]
-    Oid(String),
-
-    /// Failed to check the commit graph
-    #[error("Error while checking graph ahead/behind")]
-    CommitGraph(#[source] git2::Error),
-
-    /// A filesystem IO operation failed
-    #[error("File IO failed on {filename}")]
-    Io {
-        /// Filename that op failed on
-        filename: PathBuf,
-        /// Underlying error
-        source: io::Error,
-    },
+#[error("failed getting repo status for {path}")]
+pub struct UncommittedError {
+    /// Path to the repo
+    path: PathBuf,
+    /// Underlying error
+    source: git2::Error,
 }
 
 /// Check if there are any uncommitted local changes
 ///
 /// # Errors
 ///
-/// Return `Error::RepoStatus` if the repo status query fails.
-pub fn check_uncommitted(repo: &Repository) -> Result<bool, Error> {
+/// See `UncommittedError`
+pub fn check_uncommitted(repo: &Repository) -> Result<bool, UncommittedError> {
     let mut status_opts = StatusOptions::new();
     status_opts.include_ignored(false).include_untracked(true);
 
     let statuses = repo
         .statuses(Some(&mut status_opts))
-        .map_err(|e| Error::RepoStatus {
+        .map_err(|e| UncommittedError {
             path: repo.path().to_owned(),
             source: e,
         })?;
     Ok(!statuses.is_empty())
 }
 
+/// Error type for `check_stashed()`
+#[derive(thiserror::Error, Debug)]
+#[error("failed to check the stash")]
+pub struct StashedError(#[source] git2::Error);
+
 /// Check if there are any stashed changes.
 ///
 /// # Errors
 ///
 /// Return `Error::Stash` if any of the stash queries fail.
-pub fn check_stashed(repo: &mut Repository) -> Result<u32, Error> {
+pub fn check_stashed(repo: &mut Repository) -> Result<u32, StashedError> {
     let mut stash_count = 0;
 
     let cb = |_index: usize, _msg: &str, _id: &Oid| -> bool {
         stash_count += 1;
         true
     };
-    repo.stash_foreach(cb).map_err(Error::Stash)?;
+    repo.stash_foreach(cb).map_err(StashedError)?;
 
     Ok(stash_count)
 }
@@ -99,19 +76,34 @@ pub struct AheadBehind {
     pub upstream_name: Option<String>,
 }
 
+/// Error type for `check_ahead_behind()`
+#[derive(thiserror::Error, Debug)]
+#[error("failed to fetch origin")]
+pub struct AheadBehindError(#[source] git2::Error);
+
+/// Error type for the iterator returned from `check_ahead_behind()`
+#[derive(thiserror::Error, Debug)]
+pub enum AheadBehindIterError {
+    /// Failed to get OID of a branch
+    #[error("failed to get OID of branch {0}")]
+    Oid(String),
+
+    /// Failed to check the commit graph
+    #[error("Error while checking graph ahead/behind")]
+    CommitGraph(#[source] git2::Error),
+}
+
 /// Check if local is ahead or behind remote
 /// Fetch from origin first to make sure upstream is accurate.
 /// If your remote isn't origin then tough luck.
 ///
 /// # Errors
 ///
-/// Return `Error::FetchOrigin` if the fetching fails.
-/// Return `Error::OidLocal` if querying the local branch OID fails.
-/// Return `Error::OidUpstream` if querying the upstream branch OID fails.
-/// Return `Error::CommitGraph` if querying the commit graph fails.
+/// See `AheadBehindError`
 pub fn check_ahead_behind(
     repo: &Repository,
-) -> Result<impl Iterator<Item = Result<AheadBehind, Error>> + '_, Error> {
+) -> Result<impl Iterator<Item = Result<AheadBehind, AheadBehindIterError>> + '_, AheadBehindError>
+{
     if let Ok(mut remote) = repo.find_remote("origin") {
         let refspecs: &[&str] = &[]; // Use base refspecs, which I assume means all local branches
         let mut cbs = RemoteCallbacks::new();
@@ -120,29 +112,29 @@ pub fn check_ahead_behind(
         opts.remote_callbacks(cbs);
         remote
             .fetch(refspecs, Some(&mut opts), None)
-            .map_err(Error::FetchOrigin)?;
+            .map_err(AheadBehindError)?;
     }
 
     Ok(repo
         .branches(Some(BranchType::Local))
         .expect("Failed to get list of local branches")
         .flatten()
-        .map(|(local, _)| -> Result<AheadBehind, Error> {
+        .map(|(local, _)| -> Result<AheadBehind, AheadBehindIterError> {
             if let Ok(upstream) = local.upstream() {
                 // We have an upstream, so check the graph difference between it and the local
                 let local_oid = local.get().target().ok_or_else(|| {
-                    Error::Oid(
+                    AheadBehindIterError::Oid(
                         branch_to_string(&local).unwrap_or_else(|| String::from("(unnamed??)")),
                     )
                 })?;
                 let upstream_oid = upstream.get().target().ok_or_else(|| {
-                    Error::Oid(
+                    AheadBehindIterError::Oid(
                         branch_to_string(&upstream).unwrap_or_else(|| String::from("(unnamed??)")),
                     )
                 })?;
                 let (ahead, behind) = repo
                     .graph_ahead_behind(local_oid, upstream_oid)
-                    .map_err(Error::CommitGraph)?;
+                    .map_err(AheadBehindIterError::CommitGraph)?;
                 Ok(AheadBehind {
                     ahead: Some(ahead),
                     behind: Some(behind),
@@ -268,6 +260,16 @@ pub struct Hook {
     pub state: HookState,
 }
 
+/// Error type for `check_hooks()`
+#[derive(thiserror::Error, Debug)]
+#[error("File IO failed on \"{filename}\"")]
+pub struct HooksError {
+    /// Filename that op failed on
+    filename: PathBuf,
+    /// Underlying error
+    source: io::Error,
+}
+
 /// Check whether git hooks match up in .githooks and .git/hooks
 /// Ignore files that end with `.sample`.
 /// For each hook found, give the filename and state of it.
@@ -275,7 +277,7 @@ pub struct Hook {
 /// # Errors
 ///
 /// Return `Error::Io` if any file operation fails.
-pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, Error> {
+pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, HooksError> {
     // Note that repo.path() points to the .git directory
     let active_dir = repo.path().join("hooks/");
     let active_hooks: HashSet<_> = hook_filenames_in_dir(&active_dir).collect();
@@ -289,14 +291,14 @@ pub fn check_hooks(repo: &Repository) -> Result<Vec<Hook>, Error> {
     let in_both: HashSet<_> = active_hooks.intersection(&in_repo_hooks).cloned().collect();
     for path in &in_both {
         let active_path = repo.path().join("hooks/").join(path);
-        let active_bytes = fs::read(&active_path).map_err(|e| Error::Io {
+        let active_bytes = fs::read(&active_path).map_err(|e| HooksError {
             filename: active_path,
             source: e,
         })?;
         let active_hash = Sha256::digest(active_bytes);
 
         let in_repo_path = repo.path().join("../.githooks/").join(path);
-        let in_repo_bytes = fs::read(&in_repo_path).map_err(|e| Error::Io {
+        let in_repo_bytes = fs::read(&in_repo_path).map_err(|e| HooksError {
             filename: in_repo_path,
             source: e,
         })?;
