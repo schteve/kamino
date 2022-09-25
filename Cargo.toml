@@ -30,3 +30,6 @@ anyhow = "1.0.64"
 version = "0"
 features = ["vendored"]
 optional = true # Don't enable on a normal build, only use vendored if it's manually enabled
+
+[dev-dependencies]
+tempfile = "3.3.0"
