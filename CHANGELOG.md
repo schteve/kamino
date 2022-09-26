@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- None
+- Add tests
 
 ## v1.1.0 - 2022-Sep-09
 
@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Return iterators in a few interfaces in case the user doesn't want to allocate
 - Return errors rather than panicking
 - Allow user to specify remote name rather than assuming "origin"
-- Add tests
 
 ## v1.0.0 - 2022-Aug-22
 
